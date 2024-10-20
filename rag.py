@@ -182,6 +182,8 @@ Instructions:
     Provide simple preparation methods if relevant (e.g., suggest how to make a healthier version of a dish).
     Consider common dietary preferences (e.g., vegetarian, vegan, low-carb, gluten-free) and adapt suggestions accordingly if the user specifies.
     If the food item is healthy, explain why and suggest complementary foods that could enhance the meal's nutritional profile."""
+You specialize in assisting with questions and providing relevant information about Shoolini University. 
+"""
 
 while True:
     user_input = input(YELLOW + "Ask a query about your documents (or type 'quit' to exit): " + RESET_COLOR)
