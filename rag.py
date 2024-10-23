@@ -1,152 +1,182 @@
 import torch
-import ollama
 import os
-from openai import OpenAI
-import argparse
 import json
+from openvino.runtime import Core
+import argparse
+from transformers import AutoTokenizer
+from optimum.intel.openvino import OVModelForCausalLM
+from sentence_transformers import SentenceTransformer
 
 # ANSI escape codes for colors
-PINK = '\033[95m'
-CYAN = '\033[96m'
-YELLOW = '\033[93m'
-NEON_GREEN = '\033[92m'
-RESET_COLOR = '\033[0m'
+PINK = '\033[95m'  # Pink color for console output
+CYAN = '\033[96m'  # Cyan color for console output
+YELLOW = '\033[93m'  # Yellow color for console output
+NEON_GREEN = '\033[92m'  # Neon green color for console output
+RESET_COLOR = '\033[0m'  # Reset color to default
 
 # Global variables for conversation history and vault content
-conversation_history = []
-vault_embeddings_tensor = torch.tensor([])  # Initially empty
-vault_content = []
+conversation_history = []  # History of messages in the conversation
+vault_embeddings_tensor = torch.tensor([])  # Tensor for embeddings, initially empty
+vault_content = []  # Content of the vault (text documents)
 
-# Function to open a file and return its contents as a string
+model_id = "OpenVINO/mistral-7b-instruct-v0.1-int8-ov"  # Model ID for OpenVINO
+tokenizer = AutoTokenizer.from_pretrained(model_id)  # Load tokenizer for the model
+model = OVModelForCausalLM.from_pretrained(model_id)  # Load the OpenVINO model
+
+# Function to load an OpenVINO model from a specified path
+def load_openvino_model(model_path):
+    core = Core()  # Initialize OpenVINO Core
+    model = core.read_model(model=model_path)  # Read the model
+    compiled_model = core.compile_model(model, "MYRIAD")  # Compile the model for the MYRIAD device
+    return compiled_model  # Return the compiled model
+
+# Function to read the contents of a file and return it as a string
 def open_file(filepath):
-    with open(filepath, 'r', encoding='utf-8') as infile:
-        return infile.read()
+    with open(filepath, 'r', encoding='utf-8') as infile:  # Open file in read mode
+        return infile.read()  # Return file contents
 
-# Function to get relevant context from the vault based on user input
+# Function to retrieve relevant context from the vault based on user input
 def get_relevant_context(rewritten_input, vault_embeddings, vault_content, top_k=1):
     if vault_embeddings.nelement() == 0:  # Check if the tensor has any elements
-        return []
-    # Encode the rewritten input
-    input_embedding = ollama.embeddings(model='mxbai-embed-large', prompt=rewritten_input)["embedding"]
+        return []  # Return an empty list if there are no embeddings
+
+    # Placeholder for input embedding generation; replace with your method
+    input_embedding = generate_embedding(rewritten_input)  # Generate embedding for the input
+
     # Compute cosine similarity between the input and vault embeddings
     cos_scores = torch.cosine_similarity(torch.tensor(input_embedding).unsqueeze(0), vault_embeddings)
-    # Adjust top_k if it's greater than the number of available scores
-    top_k = min(top_k, len(cos_scores))
-    # Sort the scores and get the top-k indices
-    top_indices = torch.topk(cos_scores, k=top_k)[1].tolist()
-    # Get the corresponding context from the vault
-    relevant_context = [vault_content[idx].strip() for idx in top_indices]
-    return relevant_context
+    top_k = min(top_k, len(cos_scores))  # Get the minimum of top_k and available embeddings
+    top_indices = torch.topk(cos_scores, k=top_k)[1].tolist()  # Get indices of top k relevant documents
+    relevant_context = [vault_content[idx].strip() for idx in top_indices]  # Retrieve relevant context
+    return relevant_context  # Return the relevant context
 
-# Function to rewrite the query based on conversation history
-def rewrite_query(user_input_json, conversation_history, ollama_model):
-    user_input = json.loads(user_input_json)["Query"]
-    context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in conversation_history[-2:]])
+embedding_model = SentenceTransformer('all-MiniLM-L6-v2')  # Load the embedding model for context generation
+
+# Function to generate embeddings for the input text
+def generate_embedding(text):
+    embedding = embedding_model.encode(text)  # Generate embedding
+    return embedding.tolist()  # Convert to list and return
+
+# Function to rewrite the user query based on conversation history
+def rewrite_query(user_input_json, conversation_history):
+    user_input = json.loads(user_input_json)["Query"]  # Load the user query from JSON
+    context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in conversation_history[-2:]])  # Get recent context
     prompt = f"""Rewrite the following query by incorporating relevant context from the conversation history.
     The rewritten query should:
-    
+
     - Preserve the core intent and meaning of the original query
     - Expand and clarify the query to make it more specific and informative for retrieving relevant context
     - Avoid introducing new topics or queries that deviate from the original query
     - DONT EVER ANSWER the Original query, but instead focus on rephrasing and expanding it into a new query
-    
+
     Return ONLY the rewritten query text, without any additional formatting or explanations.
-    
+
     Conversation History:
     {context}
-    
+
     Original query: [{user_input}]
-    
+
     Rewritten query: 
     """
-    response = client.chat.completions.create(
-        model=ollama_model,
-        messages=[{"role": "system", "content": prompt}],
-        max_tokens=200,
-        n=1,
-        temperature=0.1,
-    )
-    rewritten_query = response.choices[0].message.content.strip()
-    return json.dumps({"Rewritten Query": rewritten_query})
+    # Replace with actual logic to generate a rewritten query
+    rewritten_query = "..."  # Placeholder for the rewritten query
+    return json.dumps({"Rewritten Query": rewritten_query})  # Return as JSON
 
-# Function to perform chat and retrieve relevant information from the vault
-def ollama_chat(user_input, system_message, vault_embeddings, vault_content, ollama_model, conversation_history):
-    conversation_history.append({"role": "user", "content": user_input})
-    
-    if len(conversation_history) > 1:
+# Function to generate a response from the OpenVINO model
+def generate_openvino_response(messages, tokenizer, model):
+    # Convert messages to the appropriate format
+    conversation_str = ""
+    for message in messages:
+        conversation_str += f"{message['role']}: {message['content']}\n"  # Concatenate messages
+
+    # Prepare input for the model
+    inputs = tokenizer(conversation_str, return_tensors="pt")  # Tokenize the input
+
+    # Generate a response with specified parameters
+    outputs = model.generate(
+        **inputs,
+        max_length=500,  # Maximum length of the response
+        max_new_tokens=100,  # Limit the number of tokens generated
+        do_sample=True,  # Allow random generation
+        temperature=0.7,  # Controls randomness in generation
+        top_k=50,  # Only consider the top 50 tokens
+        top_p=0.95  # Nucleus sampling
+    )
+
+    # Decode and return the response
+    response = tokenizer.decode(outputs[0], skip_special_tokens=True)  # Decode the output
+    return response  # Return the generated response
+
+# Main chat function to handle user input and generate responses
+def chat(user_input, system_message, vault_embeddings, vault_content, conversation_history, tokenizer, model):
+    conversation_history.append({"role": "user", "content": user_input})  # Append user input to history
+
+    if len(conversation_history) > 1:  # If there is more than one message in history
         query_json = {
             "Query": user_input,
             "Rewritten Query": ""
         }
-        rewritten_query_json = rewrite_query(json.dumps(query_json), conversation_history, ollama_model)
-        rewritten_query_data = json.loads(rewritten_query_json)
-        rewritten_query = rewritten_query_data["Rewritten Query"]
-        print(PINK + "Original Query: " + user_input + RESET_COLOR)
-        print(PINK + "Rewritten Query: " + rewritten_query + RESET_COLOR)
+        rewritten_query_json = rewrite_query(json.dumps(query_json), conversation_history)  # Rewrite the query
+        rewritten_query_data = json.loads(rewritten_query_json)  # Load the rewritten query data
+        rewritten_query = rewritten_query_data["Rewritten Query"]  # Get the rewritten query
+        print(PINK + "Original Query: " + user_input + RESET_COLOR)  # Print original query
+        print(PINK + "Rewritten Query: " + rewritten_query + RESET_COLOR)  # Print rewritten query
     else:
-        rewritten_query = user_input
-    
-    relevant_context = get_relevant_context(rewritten_query, vault_embeddings, vault_content)
+        rewritten_query = user_input  # If no history, use original input
+
+    relevant_context = get_relevant_context(rewritten_query, vault_embeddings, vault_content)  # Get relevant context
     if relevant_context:
-        context_str = "\n".join(relevant_context)
-        print("Context Pulled from Documents: \n\n" + CYAN + context_str + RESET_COLOR)
+        context_str = "\n".join(relevant_context)  # Join relevant contexts into a string
+        print("Context Pulled from Documents: \n\n" + CYAN + context_str + RESET_COLOR)  # Print context
     else:
-        print(CYAN + "No relevant context found." + RESET_COLOR)
-    
-    user_input_with_context = user_input
+        print(CYAN + "No relevant context found." + RESET_COLOR)  # Print if no context found
+
+    user_input_with_context = user_input  # Initialize the user input with context
     if relevant_context:
-        user_input_with_context = user_input + "\n\nRelevant Context:\n" + context_str
-    
-    conversation_history[-1]["content"] = user_input_with_context
-    
+        user_input_with_context = user_input + "\n\nRelevant Context:\n" + context_str  # Add context to user input
+
+    conversation_history[-1]["content"] = user_input_with_context  # Update the last message in history
+
     messages = [
-        {"role": "system", "content": system_message},
-        *conversation_history
+        {"role": "system", "content": system_message},  # Add system message to messages
+        *conversation_history  # Include the conversation history
     ]
-    
-    response = client.chat.completions.create(
-        model=ollama_model,
-        messages=messages,
-        max_tokens=2000,
-    )
-    
-    conversation_history.append({"role": "assistant", "content": response.choices[0].message.content})
-    
-    return response.choices[0].message.content
+
+    # Ensure tokenizer and model are passed to the function
+    response = generate_openvino_response(messages, tokenizer, model)  # Generate the response
+    conversation_history.append({"role": "assistant", "content": response})  # Append assistant's response to history
+
+    return response  # Return the assistant's response
 
 # Function to reset context when data source changes
 def reset_context():
     global conversation_history, vault_embeddings_tensor, vault_content
-    # Clear conversation history
-    conversation_history = []
-    
-    # Clear vault embeddings and reload new content
-    vault_content = []
-    if os.path.exists("vault3.txt"):
-        with open("vault3.txt", "r", encoding='utf-8') as vault_file:
-            vault_content = vault_file.readlines()
+    conversation_history = []  # Reset conversation history
+    vault_content = []  # Reset vault content
 
-    print(NEON_GREEN + "Generating new embeddings for the vault content..." + RESET_COLOR)
-    vault_embeddings = []
+    if os.path.exists("vault3.txt"):  # Check if the vault file exists
+        with open("vault3.txt", "r", encoding='utf-8') as vault_file:
+            vault_content = vault_file.readlines()  # Load vault content from file
+
+    print(NEON_GREEN + "Generating new embeddings for the vault content..." + RESET_COLOR)  # Notify about embedding generation
+    vault_embeddings = []  # Initialize list for embeddings
     for content in vault_content:
-        response = ollama.embeddings(model='mxbai-embed-large', prompt=content)
-        vault_embeddings.append(response["embedding"])
-    
-    vault_embeddings_tensor = torch.tensor(vault_embeddings)
-    print("New embeddings generated and stored.")
+        # Replace with your embedding generation logic
+        embedding = generate_embedding(content)  # Generate embedding for each content
+        vault_embeddings.append(embedding)  # Append embedding to the list
+
+    global vault_embeddings_tensor
+    vault_embeddings_tensor = torch.tensor(vault_embeddings)  # Convert list to tensor
+    print("New embeddings generated and stored.")  # Notify that embeddings are generated
+
+
 
 # Parse command-line arguments
 print(NEON_GREEN + "Parsing command-line arguments..." + RESET_COLOR)
-parser = argparse.ArgumentParser(description="Ollama Chat")
-parser.add_argument("--model", default="mistral", help="Ollama model to use (default: llama3)")
+parser = argparse.ArgumentParser(description="OpenVINO Chat")
+parser.add_argument("--model", default="OpenVINO/mistral-7b-instruct-v0.1-int8-ov",
+                    help="OpenVINO model to use (default: mistral)")
 args = parser.parse_args()
-
-# Configuration for the Ollama API client
-print(NEON_GREEN + "Initializing Ollama API client..." + RESET_COLOR)
-client = OpenAI(
-    base_url='http://localhost:11434/v1',
-    api_key='llama3'
-)
 
 # Load the vault content
 print(NEON_GREEN + "Loading vault content..." + RESET_COLOR)
@@ -155,18 +185,18 @@ if os.path.exists("vault3.txt"):
     with open("vault3.txt", "r", encoding='utf-8') as vault_file:
         vault_content = vault_file.readlines()
 
-# Generate embeddings for the vault content using Ollama
+# Generate embeddings for the vault content using placeholder logic
 print(NEON_GREEN + "Generating embeddings for the vault content..." + RESET_COLOR)
 vault_embeddings = []
 for content in vault_content:
-    response = ollama.embeddings(model='mxbai-embed-large', prompt=content)
-    vault_embeddings.append(response["embedding"])
+    embedding = generate_embedding(content)  # Replace with actual logic
+    vault_embeddings.append(embedding)
 
 # Convert to tensor and print embeddings
-print("Converting embeddings to tensor...")
-vault_embeddings_tensor = torch.tensor(vault_embeddings) 
+vault_embeddings_tensor = torch.tensor(vault_embeddings)
 print("Embeddings for each line in the vault:")
 print(vault_embeddings_tensor)
+
 
 # Conversation loop
 print("Starting conversation loop...")
@@ -187,11 +217,13 @@ while True:
     user_input = input(YELLOW + "Ask a query about your documents (or type 'quit' to exit): " + RESET_COLOR)
     if user_input.lower() == 'quit':
         break
-    
+
     # Check if a new data source has been detected and reset context if needed
     new_data_source_detected = False  # Set this to True when the data source changes
     if new_data_source_detected:
         reset_context()
-    
-    response = ollama_chat(user_input, system_message, vault_embeddings_tensor, vault_content, args.model, conversation_history)
+
+    # Suponiendo que ya tienes tokenizer y model definidos en tu código
+    response = chat(user_input, system_message, vault_embeddings_tensor, vault_content, conversation_history, tokenizer,
+                    model)
     print(NEON_GREEN + "Response: \n\n" + response + RESET_COLOR)
