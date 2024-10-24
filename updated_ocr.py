@@ -60,7 +60,7 @@ if input_option == "Text":
     # Display the entered text when a button is pressed
     if st.button("Look for Query"):
         if user_text:
-            response = user_chat(user_text, embeddings)  # Pass embeddings to the chat function
+            response = user_chat(user_text)  # Pass embeddings to the chat function
             st.write(f"Generated Output: {response}")
         else:
             st.error("Please enter some text")
@@ -79,7 +79,7 @@ elif input_option == "Image":
         extracted_text = " ".join(line[1][0].strip() for line in ocr_result[0]).replace('\n', ' ')  # Extract text without confidence scores
 
         if extracted_text:
-            response = user_chat(extracted_text, embeddings)  # Pass embeddings to the chat function
+            response = user_chat(extracted_text)  # Pass embeddings to the chat function
             st.write(f"Generated Output: {response}")
         else:
             st.error("OCR could not extract text")
