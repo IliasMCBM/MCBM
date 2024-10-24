@@ -188,8 +188,8 @@ def reset_context():
 
 @st.cache_data
 def embedding_processing():
-    
-    
+
+
     print(" Embedding processing starts")
     vault_embeddings = []
     if os.path.exists("vault3.txt"):
@@ -201,13 +201,48 @@ def embedding_processing():
     # Convert to tensor and print embeddings
     vault_embeddings_tensor = torch.tensor(vault_embeddings)
     print("Embedding is done")
-    
+
+
 def user_chat(input_text):
-    
-    response = chat(input_text, system_message, vault_embeddings_tensor, vault_content, conversation_history, tokenizer,
-                    model)
+    # Actualiza el historial de conversación solo si es necesario
+    conversation_history.append({"role": "user", "content": input_text})
+
+    response = chat(input_text, system_message, vault_embeddings_tensor, vault_content,
+                    conversation_history, tokenizer, model)
+
+    # Añade la respuesta al historial si lo necesitas
+    conversation_history.append({"role": "assistant", "content": response})
+
     return response
-    
+embeddings_file = "vault_embeddings.pt"
+
+def generate_embeddings_for_vault_content():
+    global vault_embeddings_tensor, vault_content
+    vault_embeddings = []
+    if os.path.exists("vault3.txt"):
+        with open("vault3.txt", "r", encoding='utf-8') as vault_file:
+            vault_content = vault_file.readlines()
+
+    print(NEON_GREEN + "Generating embeddings for the vault content..." + RESET_COLOR)
+
+    for content in vault_content:
+        embedding = embedding_model.encode(content)
+        vault_embeddings.append(embedding)
+
+    vault_embeddings_tensor = torch.tensor(vault_embeddings)
+    torch.save(vault_embeddings_tensor, embeddings_file)
+    print("New embeddings generated and stored.")
+    return vault_embeddings_tensor
+
+def load_embeddings():
+    try:
+
+        vault_embeddings_tensor = torch.load('C:/Users/devcloud/PycharmProjects/pythonProject/MCBM/vault_embeddings.pt')
+        return vault_embeddings_tensor
+    except Exception as e:
+        print(f"Error al cargar embeddings: {e}")
+        return None
+
 
 # # Parse command-line arguments
 # print(NEON_GREEN + "Parsing command-line arguments..." + RESET_COLOR)

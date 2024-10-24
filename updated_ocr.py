@@ -1,11 +1,16 @@
-
 import streamlit as st
 from paddleocr import PaddleOCR
 import numpy as np
 from PIL import Image
-from rag import embedding_processing, user_chat
+from rag import embedding_processing, user_chat, generate_embeddings_for_vault_content, load_embeddings
 
-embedding_processing()
+# Load embeddings only once when the app starts
+embeddings = load_embeddings()  # Load embeddings from file
+if embeddings is None:
+    print('Embedding not foun')
+    embeddings = generate_embeddings_for_vault_content()  # Generate embeddings if not found
+else:
+    print('Loading embedding')
 
 # Supported languages for OCR
 languages = {
@@ -55,7 +60,7 @@ if input_option == "Text":
     # Display the entered text when a button is pressed
     if st.button("Look for Query"):
         if user_text:
-            response = user_chat(user_text)
+            response = user_chat(user_text, embeddings)  # Pass embeddings to the chat function
             st.write(f"Generated Output: {response}")
         else:
             st.error("Please enter some text")
@@ -71,12 +76,11 @@ elif input_option == "Image":
 
         # Perform OCR on the uploaded image
         ocr_result = ocr.ocr(img_array, cls=True)
-        extracted_text = " ".join([line[1][0] for line in ocr_result[0]])  # Extract text without confidence scores
+        extracted_text = " ".join(line[1][0].strip() for line in ocr_result[0]).replace('\n', ' ')  # Extract text without confidence scores
 
         if extracted_text:
-            response = user_chat(extracted_text)
+            response = user_chat(extracted_text, embeddings)  # Pass embeddings to the chat function
             st.write(f"Generated Output: {response}")
         else:
             st.error("OCR could not extract text")
-        
-        # Display the extracted text
+
