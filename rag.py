@@ -51,19 +51,34 @@ def open_file(filepath):
         return infile.read()  # Return file contents
 
 # Function to retrieve relevant context from the vault based on user input
-def get_relevant_context(rewritten_input, vault_embeddings, vault_content, top_k=1):
-    if vault_embeddings.nelement() == 0:  # Check if the tensor has any elements
-        return []  # Return an empty list if there are no embeddings
 
-    # Placeholder for input embedding generation; replace with your method
-    input_embedding = generate_embedding(rewritten_input)  # Generate embedding for the input
+def get_relevant_context(rewritten_input, vault_content, top_k=1):
 
-    # Compute cosine similarity between the input and vault embeddings
-    cos_scores = torch.cosine_similarity(torch.tensor(input_embedding).unsqueeze(0), vault_embeddings)
-    top_k = min(top_k, len(cos_scores))  # Get the minimum of top_k and available embeddings
-    top_indices = torch.topk(cos_scores, k=top_k)[1].tolist()  # Get indices of top k relevant documents
-    relevant_context = [vault_content[idx].strip() for idx in top_indices]  # Retrieve relevant context
-    return relevant_context  # Return the relevant context
+
+    vault_embeddings = load_embeddings()
+
+    if vault_embeddings is None or vault_embeddings.nelement() == 0:
+        return []
+
+
+    input_embedding = generate_embedding(rewritten_input)
+
+
+    input_embedding_tensor = torch.tensor(input_embedding).unsqueeze(0)
+
+
+    try:
+        cos_scores = torch.cosine_similarity(input_embedding_tensor, vault_embeddings)
+
+
+        top_k = min(top_k, cos_scores.size(0))
+        top_indices = torch.topk(cos_scores, k=top_k)[
+            1].tolist()
+        relevant_context = [vault_content[idx].strip() for idx in top_indices]
+    except Exception as e:
+        relevant_context = []
+
+    return relevant_context
 
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')  # Load the embedding model for context generation
 
