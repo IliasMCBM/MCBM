@@ -99,27 +99,27 @@ def rewrite_query(user_input_json, conversation_history):
 
 # Function to generate a response from the OpenVINO model
 def generate_openvino_response(messages, tokenizer, model):
-    # Convert messages to the appropriate format
-    conversation_str = ""
-    for message in messages:
-        conversation_str += f"{message['role']}: {message['content']}\n"  # Concatenate messages
+    # Solo incluir el último mensaje del usuario para obtener la respuesta adecuada
+    user_message = messages[-1]['content'] if messages and messages[-1]['role'] == 'user' else ""
 
-    # Prepare input for the model
-    inputs = tokenizer(conversation_str, return_tensors="pt")  # Tokenize the input
+    # Prepare input for the model con el último mensaje del usuario
+    inputs = tokenizer(user_message, return_tensors="pt")  # Tokeniza solo el mensaje del usuario
 
-    # Generate a response with specified parameters
+    # Generar una respuesta con los parámetros especificados
     outputs = model.generate(
         **inputs,
-        max_length=500,  # Maximum length of the response
-        max_new_tokens=100,  # Limit the number of tokens generated
-        do_sample=True,  # Allow random generation
-        temperature=0.7,  # Controls randomness in generation
-        top_k=50,  # Only consider the top 50 tokens
-        top_p=0.95  # Nucleus sampling
+        max_length=500,  # Longitud máxima de la respuesta
+        max_new_tokens=100,  # Limita el número de nuevos tokens generados
+        do_sample=True,  # Permite generación aleatoria
+        temperature=0.7,  # Controla la aleatoriedad en la generación
+        top_k=50,  # Considera solo los 50 tokens más probables
+        top_p=0.95  # Muestreo por núcleo
     )
 
-    # Decode and return the response
-    response = tokenizer.decode(outputs[0], skip_special_tokens=True)  # Decode the output
+    # Decodificar la salida y limpiar los espacios en blanco
+    response = tokenizer.decode(outputs[0], skip_special_tokens=True).strip()  # Decodifica y elimina tokens especiales
+
+    print("\033[91m" + response + "\033[0m")
     return response  # Return the generated response
 
 # Main chat function to handle user input and generate responses
@@ -212,7 +212,8 @@ def user_chat(input_text):
 
     # Añade la respuesta al historial si lo necesitas
     conversation_history.append({"role": "assistant", "content": response})
-
+    green_response = f"\033[92m{response}\033[0m"  # Aplica el color verde
+    print(green_response)
     return response
 embeddings_file = "vault_embeddings.pt"
 
