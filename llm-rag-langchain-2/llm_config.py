@@ -1,5 +1,6 @@
 DEFAULT_SYSTEM_PROMPT = """\
-You are a helpful assistant that is an expert at extracting the most useful information from a given text.\ 
+You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe.  Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature.
+If a question does not make any sense or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.\
 """
 
 DEFAULT_SYSTEM_PROMPT_CHINESE = """\
@@ -13,15 +14,9 @@ DEFAULT_SYSTEM_PROMPT_JAPANESE = """\
 """
 
 DEFAULT_RAG_PROMPT = """\
-You are a nutrition expert with in-depth knowledge of healthy eating and food science. Your goal is to provide users with personalized, evidence-based food recommendations based on the food item they mention. You prioritize health, nutrient balance, and dietary guidelines in all your responses. For each food item, suggest healthy alternatives, preparation methods, or complementary foods to improve the nutritional value of the user's diet. Be concise, accurate, and clear in your recommendations.\
-
-Instructions:\
-
-    When a user inputs a specific food item (e.g., "pizza"), suggest healthier variations or alternatives, along with nutrient information and possible health benefits.\
-    Provide simple preparation methods if relevant (e.g., suggest how to make a healthier version of a dish).\
-    Consider common dietary preferences (e.g., vegetarian, vegan, low-carb, gluten-free) and adapt suggestions accordingly if the user specifies.\
-    If the food item is healthy, explain why and suggest complementary foods that could enhance the meal's nutritional profile.\
+You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know. Use three sentences maximum and keep the answer concise.\
 """
+
 DEFAULT_RAG_PROMPT_CHINESE = """\
 基于以下已知信息，请简洁并专业地回答用户的问题。如果无法从中得到答案，请说 "根据已知信息无法回答该问题" 或 "没有提供足够的相关信息"。不允许在答案中添加编造成分。另外，答案请使用中文。\
 """
@@ -256,6 +251,41 @@ SUPPORTED_LLM_MODELS = {
             """,
             "completion_to_prompt": llama3_completion_to_prompt,
         },
+        "llama-3.1-8b-instruct": {
+            "model_id": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+            "remote_code": False,
+            "start_message": DEFAULT_SYSTEM_PROMPT,
+            "stop_tokens": ["<|eot_id|>", "<|end_of_text|>"],
+            "has_chat_template": True,
+            "start_message": " <|start_header_id|>system<|end_header_id|>\n\n" + DEFAULT_SYSTEM_PROMPT + "<|eot_id|>",
+            "history_template": "<|start_header_id|>user<|end_header_id|>\n\n{user}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n{assistant}<|eot_id|>",
+            "current_message_template": "<|start_header_id|>user<|end_header_id|>\n\n{user}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n{assistant}",
+            "rag_prompt_template": f"<|start_header_id|>system<|end_header_id|>\n\n{DEFAULT_RAG_PROMPT}<|eot_id|>"
+            + """<|start_header_id|>user<|end_header_id|>
+            
+            
+            Question: {input}
+            Context: {context}
+            Answer:<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+            
+            """,
+            "completion_to_prompt": llama3_completion_to_prompt,
+        },
+        "mistral-7b-instruct": {
+            "model_id": "mistralai/Mistral-7B-Instruct-v0.1",
+            "remote_code": False,
+            "start_message": f"<s>[INST] <<SYS>>\n{DEFAULT_SYSTEM_PROMPT }\n<</SYS>>\n\n",
+            "history_template": "{user}[/INST]{assistant}</s><s>[INST]",
+            "current_message_template": "{user} [/INST]{assistant}",
+            "tokenizer_kwargs": {"add_special_tokens": False},
+            "partial_text_processor": llama_partial_text_processor,
+            "rag_prompt_template": f"""<s> [INST] {DEFAULT_RAG_PROMPT } [/INST] </s>"""
+            + """ 
+            [INST] Question: {input} 
+            Context: {context} 
+            Answer: [/INST]""",
+        },
         "zephyr-7b-beta": {
             "model_id": "HuggingFaceH4/zephyr-7b-beta",
             "remote_code": False,
@@ -345,51 +375,159 @@ SUPPORTED_LLM_MODELS = {
             """,
             "completion_to_prompt": qwen_completion_to_prompt,
         },
-        "mistral-7b-instruct": {
-            "model_id": "mistralai/Mistral-7B-Instruct-v0.1",
+    },
+    "Chinese": {
+        "qwen2.5-0.5b-instruct": {
+            "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
             "remote_code": False,
-            "start_message": f"<s>[INST] <<SYS>>\n{DEFAULT_SYSTEM_PROMPT }\n<</SYS>>\n\n",
-            "history_template": "{user}[/INST]{assistant}</s><s>[INST]",
-            "current_message_template": "{user} [/INST]{assistant}",
-            "tokenizer_kwargs": {"add_special_tokens": False},
-            "partial_text_processor": llama_partial_text_processor,
-            "rag_prompt_template": f"""<s> [INST] {DEFAULT_RAG_PROMPT } [/INST] </s>"""
-            + """ 
-            [INST] Question: {input} 
-            Context: {context} 
-            Answer: [/INST]""",
+            "start_message": DEFAULT_SYSTEM_PROMPT_CHINESE,
+            "stop_tokens": ["<|im_end|>", "<|endoftext|>"],
+            "completion_to_prompt": qwen_completion_to_prompt,
         },
-        "llama-3.1-8b-instruct": {
-            "model_id": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+        "qwen2.5-1.5b-instruct": {
+            "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
             "remote_code": False,
-            "start_message": DEFAULT_SYSTEM_PROMPT,
-            "stop_tokens": ["<|eot_id|>", "<|end_of_text|>"],
-            "has_chat_template": True,
-            "start_message": " <|start_header_id|>system<|end_header_id|>\n\n" + DEFAULT_SYSTEM_PROMPT + "<|eot_id|>",
-            "history_template": "<|start_header_id|>user<|end_header_id|>\n\n{user}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n{assistant}<|eot_id|>",
-            "current_message_template": "<|start_header_id|>user<|end_header_id|>\n\n{user}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n{assistant}",
-            "rag_prompt_template": f"<|start_header_id|>system<|end_header_id|>\n\n{DEFAULT_RAG_PROMPT}<|eot_id|>"
-            + """<|start_header_id|>user<|end_header_id|>
-            
-            
-            Question: {input}
-            Context: {context}
-            Answer:<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-            
+            "start_message": DEFAULT_SYSTEM_PROMPT_CHINESE,
+            "stop_tokens": ["<|im_end|>", "<|endoftext|>"],
+            "completion_to_prompt": qwen_completion_to_prompt,
+        },
+        "qwen2.5-3b-instruct": {
+            "model_id": "Qwen/Qwen2.5-3B-Instruct",
+            "remote_code": False,
+            "start_message": DEFAULT_SYSTEM_PROMPT_CHINESE,
+            "stop_tokens": ["<|im_end|>", "<|endoftext|>"],
+            "completion_to_prompt": qwen_completion_to_prompt,
+        },
+        "qwen2.5-7b-instruct": {
+            "model_id": "Qwen/Qwen2.5-7B-Instruct",
+            "remote_code": False,
+            "stop_tokens": ["<|im_end|>", "<|endoftext|>"],
+            "start_message": DEFAULT_SYSTEM_PROMPT_CHINESE,
+            "rag_prompt_template": f"""<|im_start|>system
+            {DEFAULT_RAG_PROMPT_CHINESE }<|im_end|>"""
+            + """
+            <|im_start|>user
+            问题: {input} 
+            已知内容: {context} 
+            回答: <|im_end|>
+            <|im_start|>assistant
             """,
-            "completion_to_prompt": llama3_completion_to_prompt,
+            "completion_to_prompt": qwen_completion_to_prompt,
+        },
+        "qwen2.5-14b-instruct": {
+            "model_id": "Qwen/Qwen2.5-14B-Instruct",
+            "remote_code": False,
+            "stop_tokens": ["<|im_end|>", "<|endoftext|>"],
+            "start_message": DEFAULT_SYSTEM_PROMPT_CHINESE,
+            "rag_prompt_template": f"""<|im_start|>system
+            {DEFAULT_RAG_PROMPT_CHINESE }<|im_end|>"""
+            + """
+            <|im_start|>user
+            问题: {input} 
+            已知内容: {context} 
+            回答: <|im_end|>
+            <|im_start|>assistant
+            """,
+            "completion_to_prompt": qwen_completion_to_prompt,
+        },
+        "qwen-7b-chat": {
+            "model_id": "Qwen/Qwen-7B-Chat",
+            "remote_code": True,
+            "start_message": f"<|im_start|>system\n {DEFAULT_SYSTEM_PROMPT_CHINESE }<|im_end|>",
+            "history_template": "<|im_start|>user\n{user}<im_end><|im_start|>assistant\n{assistant}<|im_end|>",
+            "current_message_template": '"<|im_start|>user\n{user}<im_end><|im_start|>assistant\n{assistant}',
+            "stop_tokens": ["<|im_end|>", "<|endoftext|>"],
+            "revision": "2abd8e5777bb4ce9c8ab4be7dbbd0fe4526db78d",
+            "rag_prompt_template": f"""<|im_start|>system
+            {DEFAULT_RAG_PROMPT_CHINESE }<|im_end|>"""
+            + """
+            <|im_start|>user
+            问题: {input} 
+            已知内容: {context} 
+            回答: <|im_end|>
+            <|im_start|>assistant
+            """,
+        },
+        "chatglm3-6b": {
+            "model_id": "THUDM/chatglm3-6b",
+            "remote_code": True,
+            "start_message": DEFAULT_SYSTEM_PROMPT_CHINESE,
+            "tokenizer_kwargs": {"add_special_tokens": False},
+            "rag_prompt_template": f"""{DEFAULT_RAG_PROMPT_CHINESE }"""
+            + """
+            问题: {input} 
+            已知内容: {context} 
+            回答: 
+            """,
+        },
+        "glm-4-9b-chat": {
+            "model_id": "THUDM/glm-4-9b-chat",
+            "remote_code": True,
+            "start_message": DEFAULT_SYSTEM_PROMPT_CHINESE,
+            "tokenizer_kwargs": {"add_special_tokens": False},
+            "rag_prompt_template": f"""{DEFAULT_RAG_PROMPT_CHINESE }"""
+            + """
+            问题: {input} 
+            已知内容: {context} 
+            回答: 
+            """,
+        },
+        "baichuan2-7b-chat": {
+            "model_id": "baichuan-inc/Baichuan2-7B-Chat",
+            "remote_code": True,
+            "start_message": DEFAULT_SYSTEM_PROMPT_CHINESE,
+            "tokenizer_kwargs": {"add_special_tokens": False},
+            "stop_tokens": ["<unk>", "</s>"],
+            "rag_prompt_template": f"""{DEFAULT_RAG_PROMPT_CHINESE }"""
+            + """
+            问题: {input} 
+            已知内容: {context} 
+            回答: 
+            """,
+        },
+        "minicpm-2b-dpo": {
+            "model_id": "openbmb/MiniCPM-2B-dpo-fp16",
+            "remote_code": True,
+            "start_message": DEFAULT_SYSTEM_PROMPT_CHINESE,
+        },
+        "internlm2-chat-1.8b": {
+            "model_id": "internlm/internlm2-chat-1_8b",
+            "remote_code": True,
+            "start_message": DEFAULT_SYSTEM_PROMPT_CHINESE,
+            "stop_tokens": ["</s>", "<|im_end|>"],
+            "partial_text_processor": internlm_partial_text_processor,
+        },
+        "qwen1.5-1.8b-chat": {
+            "model_id": "Qwen/Qwen1.5-1.8B-Chat",
+            "remote_code": False,
+            "start_message": DEFAULT_SYSTEM_PROMPT_CHINESE,
+            "stop_tokens": ["<|im_end|>", "<|endoftext|>"],
+            "rag_prompt_template": f"""<|im_start|>system
+            {DEFAULT_RAG_PROMPT_CHINESE }<|im_end|>"""
+            + """
+            <|im_start|>user
+            问题: {input} 
+            已知内容: {context} 
+            回答: <|im_end|>
+            <|im_start|>assistant
+            """,
+        },
+    },
+    "Japanese": {
+        "youri-7b-chat": {
+            "model_id": "rinna/youri-7b-chat",
+            "remote_code": False,
+            "start_message": f"設定: {DEFAULT_SYSTEM_PROMPT_JAPANESE}\n",
+            "history_template": "ユーザー: {user}\nシステム: {assistant}\n",
+            "current_message_template": "ユーザー: {user}\nシステム: {assistant}",
+            "tokenizer_kwargs": {"add_special_tokens": False},
+            "partial_text_processor": youri_partial_text_processor,
         },
     },
 }
 
 SUPPORTED_EMBEDDING_MODELS = {
     "English": {
-        "bge-m3": {
-            "model_id": "BAAI/bge-m3",
-            "mean_pooling": False,
-            "normalize_embeddings": True,
-        },
         "bge-small-en-v1.5": {
             "model_id": "BAAI/bge-small-en-v1.5",
             "mean_pooling": False,
@@ -400,7 +538,28 @@ SUPPORTED_EMBEDDING_MODELS = {
             "mean_pooling": False,
             "normalize_embeddings": True,
         },
-        
+        "bge-m3": {
+            "model_id": "BAAI/bge-m3",
+            "mean_pooling": False,
+            "normalize_embeddings": True,
+        },
+    },
+    "Chinese": {
+        "bge-small-zh-v1.5": {
+            "model_id": "BAAI/bge-small-zh-v1.5",
+            "mean_pooling": False,
+            "normalize_embeddings": True,
+        },
+        "bge-large-zh-v1.5": {
+            "model_id": "BAAI/bge-large-zh-v1.5",
+            "mean_pooling": False,
+            "normalize_embeddings": True,
+        },
+        "bge-m3": {
+            "model_id": "BAAI/bge-m3",
+            "mean_pooling": False,
+            "normalize_embeddings": True,
+        },
     },
 }
 

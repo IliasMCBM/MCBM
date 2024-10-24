@@ -6,6 +6,8 @@ import argparse
 from transformers import AutoTokenizer
 from optimum.intel.openvino import OVModelForCausalLM
 from sentence_transformers import SentenceTransformer
+import streamlit as st  # Still need to import Streamlit for caching
+
 
 # ANSI escape codes for colors
 PINK = '\033[95m'  # Pink color for console output
@@ -18,6 +20,19 @@ RESET_COLOR = '\033[0m'  # Reset color to default
 conversation_history = []  # History of messages in the conversation
 vault_embeddings_tensor = torch.tensor([])  # Tensor for embeddings, initially empty
 vault_content = []  # Content of the vault (text documents)
+
+system_message = """
+You are a helpful assistant that is an expert at extracting the most useful information from a given text. 
+System Prompt:
+
+You are a nutrition expert with in-depth knowledge of healthy eating and food science. Your goal is to provide users with personalized, evidence-based food recommendations based on the food item they mention. You prioritize health, nutrient balance, and dietary guidelines in all your responses. For each food item, suggest healthy alternatives, preparation methods, or complementary foods to improve the nutritional value of the user's diet. Be concise, accurate, and clear in your recommendations.
+
+Instructions:
+
+    When a user inputs a specific food item (e.g., "pizza"), suggest healthier variations or alternatives, along with nutrient information and possible health benefits.
+    Provide simple preparation methods if relevant (e.g., suggest how to make a healthier version of a dish).
+    Consider common dietary preferences (e.g., vegetarian, vegan, low-carb, gluten-free) and adapt suggestions accordingly if the user specifies.
+    If the food item is healthy, explain why and suggest complementary foods that could enhance the meal's nutritional profile."""
 
 model_id = "OpenVINO/mistral-7b-instruct-v0.1-int8-ov"  # Model ID for OpenVINO
 tokenizer = AutoTokenizer.from_pretrained(model_id)  # Load tokenizer for the model
@@ -171,59 +186,70 @@ def reset_context():
 
 
 
-# Parse command-line arguments
-print(NEON_GREEN + "Parsing command-line arguments..." + RESET_COLOR)
-parser = argparse.ArgumentParser(description="OpenVINO Chat")
-parser.add_argument("--model", default="OpenVINO/mistral-7b-instruct-v0.1-int8-ov",
-                    help="OpenVINO model to use (default: mistral)")
-args = parser.parse_args()
-
-# Load the vault content
-print(NEON_GREEN + "Loading vault content..." + RESET_COLOR)
-vault_content = []
-if os.path.exists("vault3.txt"):
-    with open("vault3.txt", "r", encoding='utf-8') as vault_file:
-        vault_content = vault_file.readlines()
-
-# Generate embeddings for the vault content using placeholder logic
-print(NEON_GREEN + "Generating embeddings for the vault content..." + RESET_COLOR)
-vault_embeddings = []
-for content in vault_content:
-    embedding = generate_embedding(content)  # Replace with actual logic
-    vault_embeddings.append(embedding)
-
-# Convert to tensor and print embeddings
-vault_embeddings_tensor = torch.tensor(vault_embeddings)
-print("Embeddings for each line in the vault:")
-print(vault_embeddings_tensor)
-
-
-# Conversation loop
-print("Starting conversation loop...")
-system_message = """
-You are a helpful assistant that is an expert at extracting the most useful information from a given text. 
-System Prompt:
-
-You are a nutrition expert with in-depth knowledge of healthy eating and food science. Your goal is to provide users with personalized, evidence-based food recommendations based on the food item they mention. You prioritize health, nutrient balance, and dietary guidelines in all your responses. For each food item, suggest healthy alternatives, preparation methods, or complementary foods to improve the nutritional value of the user's diet. Be concise, accurate, and clear in your recommendations.
-
-Instructions:
-
-    When a user inputs a specific food item (e.g., "pizza"), suggest healthier variations or alternatives, along with nutrient information and possible health benefits.
-    Provide simple preparation methods if relevant (e.g., suggest how to make a healthier version of a dish).
-    Consider common dietary preferences (e.g., vegetarian, vegan, low-carb, gluten-free) and adapt suggestions accordingly if the user specifies.
-    If the food item is healthy, explain why and suggest complementary foods that could enhance the meal's nutritional profile."""
-
-while True:
-    user_input = input(YELLOW + "Ask a query about your documents (or type 'quit' to exit): " + RESET_COLOR)
-    if user_input.lower() == 'quit':
-        break
-
-    # Check if a new data source has been detected and reset context if needed
-    new_data_source_detected = False  # Set this to True when the data source changes
-    if new_data_source_detected:
-        reset_context()
-
-    # Suponiendo que ya tienes tokenizer y model definidos en tu código
-    response = chat(user_input, system_message, vault_embeddings_tensor, vault_content, conversation_history, tokenizer,
+@st.cache_data
+def embedding_processing():
+    
+    
+    print(" Embedding processing starts")
+    vault_embeddings = []
+    if os.path.exists("vault3.txt"):
+        with open("vault3.txt", "r", encoding='utf-8') as vault_file:
+            vault_content = vault_file.readlines()
+    for content in vault_content:
+        embedding = generate_embedding(content)  # Replace with actual logic
+        vault_embeddings.append(embedding)
+    # Convert to tensor and print embeddings
+    vault_embeddings_tensor = torch.tensor(vault_embeddings)
+    print("Embedding is done")
+    
+def user_chat(input_text):
+    
+    response = chat(input_text, system_message, vault_embeddings_tensor, vault_content, conversation_history, tokenizer,
                     model)
-    print(NEON_GREEN + "Response: \n\n" + response + RESET_COLOR)
+    return response
+    
+
+# # Parse command-line arguments
+# print(NEON_GREEN + "Parsing command-line arguments..." + RESET_COLOR)
+# parser = argparse.ArgumentParser(description="OpenVINO Chat")
+# parser.add_argument("--model", default="OpenVINO/mistral-7b-instruct-v0.1-int8-ov",
+#                     help="OpenVINO model to use (default: mistral)")
+# args = parser.parse_args()
+
+# # Load the vault content
+# print(NEON_GREEN + "Loading vault content..." + RESET_COLOR)
+# vault_content = []
+# if os.path.exists("vault3.txt"):
+#     with open("vault3.txt", "r", encoding='utf-8') as vault_file:
+#         vault_content = vault_file.readlines()
+
+# # Generate embeddings for the vault content using placeholder logic
+# print(NEON_GREEN + "Generating embeddings for the vault content..." + RESET_COLOR)
+# vault_embeddings = []
+# for content in vault_content:
+#     embedding = generate_embedding(content)  # Replace with actual logic
+#     vault_embeddings.append(embedding)
+
+# # Convert to tensor and print embeddings
+# vault_embeddings_tensor = torch.tensor(vault_embeddings)
+# print("Embeddings for each line in the vault:")
+# print(vault_embeddings_tensor)
+
+
+# # Conversation loop
+# print("Starting conversation loop...")
+
+# while True:
+#     user_input = input(YELLOW + "Ask a query about your documents (or type 'quit' to exit): " + RESET_COLOR)
+#     if user_input.lower() == 'quit':
+#         break
+
+#     # Check if a new data source has been detected and reset context if needed
+#     new_data_source_detected = False  # Set this to True when the data source changes
+#     if new_data_source_detected:
+#         reset_context()
+
+#     # Suponiendo que ya tienes tokenizer y model definidos en tu código
+#     response = chat(user_input, system_message, vault_embeddings_tensor, vault_content, conversation_history, tokenizer,
+#                     model)
+#     print(NEON_GREEN + "Response: \n\n" + response + RESET_COLOR)
