@@ -19,7 +19,6 @@ RESET_COLOR = '\033[0m'  # Reset color to default
 # Global variables for conversation history and vault content
 conversation_history = []  # History of messages in the conversation
 vault_embeddings_tensor = torch.tensor([])  # Tensor for embeddings, initially empty
-vault_content = []  # Content of the vault (text documents)
 
 system_message = """
 You are a helpful assistant that is an expert at extracting the most useful information from a given text. 
@@ -37,7 +36,10 @@ Instructions:
 model_id = "OpenVINO/mistral-7b-instruct-v0.1-int8-ov"  # Model ID for OpenVINO
 tokenizer = AutoTokenizer.from_pretrained(model_id)  # Load tokenizer for the model
 model = OVModelForCausalLM.from_pretrained(model_id)  # Load the OpenVINO model
-
+if os.path.exists("vault3.txt"):
+    print('Vault loaded')# Check if the vault file exists
+    with open("vault3.txt", "r", encoding='utf-8') as vault_file:
+        vault_content = vault_file.readlines()  # Load vault content from file
 # Function to load an OpenVINO model from a specified path
 def load_openvino_model(model_path):
     core = Core()  # Initialize OpenVINO Core
@@ -52,33 +54,67 @@ def open_file(filepath):
 
 # Function to retrieve relevant context from the vault based on user input
 
+
+
+
 def get_relevant_context(rewritten_input, vault_content, top_k=1):
 
-
     vault_embeddings = load_embeddings()
-
-    if vault_embeddings is None or vault_embeddings.nelement() == 0:
+    if not isinstance(vault_content, list) or len(vault_content) == 0:
+        print("vault_content is empty or not a valid list.")
+        return []
+    # Check the type and structure of vault_embeddings
+    print(f"Type of vault_embeddings: {type(vault_embeddings)}")
+    if isinstance(vault_embeddings, list):
+        print("vault_embeddings is a list. Converting to tensor.")
+        vault_embeddings = torch.tensor(vault_embeddings).float()
+    elif vault_embeddings is None or not isinstance(vault_embeddings, torch.Tensor):
+        print("vault_embeddings is None or not a tensor.")
         return []
 
+    # Verify that vault_embeddings is two-dimensional
+    if vault_embeddings.dim() != 2:
+        print("vault_embeddings is not two-dimensional.")
+        return []
 
-    input_embedding = generate_embedding(rewritten_input)
-
-
-    input_embedding_tensor = torch.tensor(input_embedding).unsqueeze(0)
-
+    # Ensure that vault_content is a non-empty list
+    if not isinstance(vault_content, list) or len(vault_content) == 0:
+        print("vault_content is empty or not a valid list.")
+        return []
 
     try:
+        input_embedding = generate_embedding(rewritten_input)
+        input_embedding_tensor = torch.tensor(input_embedding).unsqueeze(0).float()
+
+        # Check dimensions of input_embedding and vault_embeddings
+        print(f"Dimensions of input_embedding_tensor: {input_embedding_tensor.shape}")
+        print(f"Dimensions of vault_embeddings: {vault_embeddings.shape}")
+        if input_embedding_tensor.size(1) != vault_embeddings.size(1):
+            raise ValueError("Dimensions of embeddings do not match between input and vault.")
+
         cos_scores = torch.cosine_similarity(input_embedding_tensor, vault_embeddings)
 
+        # Ensure that top_k is an integer and not a list
+        if isinstance(top_k, list):
+            top_k = top_k[0] if top_k else 1
+        top_k = int(top_k)
+
+        print(f"Value of top_k after ensuring it is an integer: {top_k}")
 
         top_k = min(top_k, cos_scores.size(0))
-        top_indices = torch.topk(cos_scores, k=top_k)[
-            1].tolist()
-        relevant_context = [vault_content[idx].strip() for idx in top_indices]
+        top_indices = torch.topk(cos_scores, k=top_k)[1].tolist()
+
+        # Validate indices to avoid out-of-bounds
+        relevant_context = [vault_content[idx].strip() for idx in top_indices if idx < len(vault_content)]
+
     except Exception as e:
+        print(f"Error in context retrieval: {e}")
         relevant_context = []
 
+    print(f"Relevant context: {relevant_context}")
     return relevant_context
+
+
 
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')  # Load the embedding model for context generation
 
@@ -91,26 +127,29 @@ def generate_embedding(text):
 def rewrite_query(user_input_json, conversation_history):
     user_input = json.loads(user_input_json)["Query"]  # Load the user query from JSON
     context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in conversation_history[-2:]])  # Get recent context
+
     prompt = f"""Rewrite the following query by incorporating relevant context from the conversation history.
     The rewritten query should:
-
     - Preserve the core intent and meaning of the original query
     - Expand and clarify the query to make it more specific and informative for retrieving relevant context
     - Avoid introducing new topics or queries that deviate from the original query
     - DONT EVER ANSWER the Original query, but instead focus on rephrasing and expanding it into a new query
-
     Return ONLY the rewritten query text, without any additional formatting or explanations.
-
     Conversation History:
     {context}
-
     Original query: [{user_input}]
-
-    Rewritten query: 
+    Rewritten query:
     """
-    # Replace with actual logic to generate a rewritten query
-    rewritten_query = "..."  # Placeholder for the rewritten query
-    return json.dumps({"Rewritten Query": rewritten_query})  # Return as JSON
+
+    # Tokenize input prompt
+    inputs = tokenizer(prompt, return_tensors="pt")
+
+    # Generate response
+    outputs = model.generate(**inputs, max_length=200, temperature=0.1)
+    rewritten_query = user_input
+
+
+    return json.dumps({"Rewritten Query": rewritten_query})
 
 # Function to generate a response from the OpenVINO model
 def generate_openvino_response(messages, tokenizer, model):
@@ -138,32 +177,33 @@ def generate_openvino_response(messages, tokenizer, model):
     return response  # Return the generated response
 
 # Main chat function to handle user input and generate responses
-def chat(user_input, system_message, vault_embeddings, vault_content, conversation_history, tokenizer, model):
-    conversation_history.append({"role": "user", "content": user_input})  # Append user input to history
+def chat(rewritten_query, system_message, vault_embeddings, vault_content, conversation_history, tokenizer, model):
+
+    conversation_history.append({"role": "user", "content": rewritten_query})  # Append user input to history
 
     if len(conversation_history) > 1:  # If there is more than one message in history
         query_json = {
-            "Query": user_input,
+            "Query": rewritten_query,
             "Rewritten Query": ""
         }
         rewritten_query_json = rewrite_query(json.dumps(query_json), conversation_history)  # Rewrite the query
         rewritten_query_data = json.loads(rewritten_query_json)  # Load the rewritten query data
         rewritten_query = rewritten_query_data["Rewritten Query"]  # Get the rewritten query
-        print(PINK + "Original Query: " + user_input + RESET_COLOR)  # Print original query
+        print(PINK + "Original Query: " + rewritten_query + RESET_COLOR)  # Print original query
         print(PINK + "Rewritten Query: " + rewritten_query + RESET_COLOR)  # Print rewritten query
     else:
-        rewritten_query = user_input  # If no history, use original input
+        rewritten_query = rewritten_query  # If no history, use original input
 
-    relevant_context = get_relevant_context(rewritten_query, vault_embeddings, vault_content)  # Get relevant context
+    relevant_context = get_relevant_context(rewritten_query, vault_content)  # Get relevant context
     if relevant_context:
         context_str = "\n".join(relevant_context)  # Join relevant contexts into a string
         print("Context Pulled from Documents: \n\n" + CYAN + context_str + RESET_COLOR)  # Print context
     else:
         print(CYAN + "No relevant context found." + RESET_COLOR)  # Print if no context found
 
-    user_input_with_context = user_input  # Initialize the user input with context
+    user_input_with_context = rewritten_query  # Initialize the user input with context
     if relevant_context:
-        user_input_with_context = user_input + "\n\nRelevant Context:\n" + context_str  # Add context to user input
+        user_input_with_context = rewritten_query + "\n\nRelevant Context:\n" + context_str  # Add context to user input
 
     conversation_history[-1]["content"] = user_input_with_context  # Update the last message in history
 
@@ -175,7 +215,7 @@ def chat(user_input, system_message, vault_embeddings, vault_content, conversati
     # Ensure tokenizer and model are passed to the function
     response = generate_openvino_response(messages, tokenizer, model)  # Generate the response
     conversation_history.append({"role": "assistant", "content": response})  # Append assistant's response to history
-
+    print("\033[91m" + "\n".join(str(item) for item in conversation_history) + "\033[0m")
     return response  # Return the assistant's response
 
 # Function to reset context when data source changes
