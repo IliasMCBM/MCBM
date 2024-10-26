@@ -2,16 +2,12 @@ from typing import Callable, Literal
 import gradio as gr
 
 
-chinese_examples = [
-    ["英特尔®酷睿™ Ultra处理器可以降低多少功耗？"],
-    ["相比英特尔之前的移动处理器产品，英特尔®酷睿™ Ultra处理器的AI推理性能提升了多少？"],
-    ["英特尔博锐® Enterprise系统提供哪些功能？"],
-]
-
 english_examples = [
-    [""],
-    [""],
-    [""],
+    ["How can I make a healthier version of pizza?"],
+    ["How can I make my salad high in protein without adding meat?"],
+    ["What’s a healthy substitute for butter when cooking?"],
+    ["What are some gluten-free options for pasta?"]
+    ["What can I eat with grilled chicken to make it a balanced dinner?"]
 ]
 
 
@@ -41,13 +37,11 @@ def make_demo(
     model_name: str,
     language: Literal["English", "Chinese"] = "English",
 ):
-    examples = chinese_examples if (language == "Chinese") else english_examples
+    examples = english_examples
 
-    if language == "English":
-        text_example_path = "text_example_en.pdf"
-    else:
-        text_example_path = "text_example_cn.pdf"
 
+    text_example_path = "text_example_en.pdf"
+    
     with gr.Blocks(
         theme=gr.themes.Soft(),
         css=".disclaimer {font-variant-caps: all-small-caps;}",

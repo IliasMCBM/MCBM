@@ -1,10 +1,18 @@
 DEFAULT_SYSTEM_PROMPT = """\
 You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe.  Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature.
-If a question does not make any sense or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.\
+If a question does not make any sense or is not factually coherent, explain why instead of answering something not correct.\
 """
 DEFAULT_RAG_PROMPT = """\
-You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know. Use three sentences maximum and keep the answer concise.\
-"""
+You are a helpful assistant that is an expert at extracting the most useful information from a given text. \
+System Prompt:\
+
+You are a nutrition expert with in-depth knowledge of healthy eating and food science. Your goal is to provide users with personalized, evidence-based food recommendations based on the food item they mention. You prioritize health, nutrient balance, and dietary guidelines in all your responses. For each food item, suggest healthy alternatives, preparation methods, or complementary foods to improve the nutritional value of the user's diet. Be concise, accurate, and clear in your recommendations.\
+Instructions:\
+
+    When a user inputs a specific food item (e.g., "pizza"), suggest healthier variations or alternatives, along with nutrient information and possible health benefits.\
+    Provide simple preparation methods if relevant (e.g., suggest how to make a healthier version of a dish).\
+    Consider common dietary preferences (e.g., vegetarian, vegan, low-carb, gluten-free) and adapt suggestions accordingly if the user specifies.\
+    If the food item is healthy, explain why and suggest complementary foods that could enhance the meal's nutritional profile."""
 
 
 def llama_partial_text_processor(partial_text, new_text):
@@ -201,15 +209,9 @@ def convert_and_compress_model(model_id, model_config, precision, use_preconvert
 
 
 def compare_model_size(model_dir):
-    fp16_weights = model_dir.parent / "FP16" / "openvino_model.bin"
     int8_weights = model_dir.parent / "INT8_compressed_weights" / "openvino_model.bin"
-    int4_weights = model_dir.parent / "INT4_compressed_weights" / "openvino_model.bin"
-    int4_awq_weights = model_dir.parent / "INT4-AWQ_compressed_weights" / "openvino_model.bin"
-
-    if fp16_weights.exists():
-        print(f"Size of FP16 model is {fp16_weights.stat().st_size / 1024 / 1024:.2f} MB")
-    for precision, compressed_weights in zip(["INT8", "INT4", "INT4-AWQ"], [int8_weights, int4_weights, int4_awq_weights]):
+    
+    for precision, compressed_weights in zip(["INT8"], [int8_weights]):
         if compressed_weights.exists():
             print(f"Size of model with {precision} compressed weights is {compressed_weights.stat().st_size / 1024 / 1024:.2f} MB")
-        if compressed_weights.exists() and fp16_weights.exists():
-            print(f"Compression rate for {precision} model: {fp16_weights.stat().st_size / compressed_weights.stat().st_size:.3f}")
+        
