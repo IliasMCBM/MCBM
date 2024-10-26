@@ -6,7 +6,7 @@ english_examples = [
     ["How can I make a healthier version of pizza?"],
     ["How can I make my salad high in protein without adding meat?"],
     ["What’s a healthy substitute for butter when cooking?"],
-    ["What are some gluten-free options for pasta?"]
+    ["What are some gluten-free options for pasta?"],
     ["What can I eat with grilled chicken to make it a balanced dinner?"]
 ]
 
