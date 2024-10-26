@@ -35,7 +35,6 @@ def make_demo(
     stop_fn: Callable,
     update_retriever_fn: Callable,
     model_name: str,
-    language: Literal["English", "Chinese"] = "English",
 ):
     examples = english_examples
 

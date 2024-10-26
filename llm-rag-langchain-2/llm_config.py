@@ -104,7 +104,7 @@ def get_optimum_cli_command(model_id, weight_format, output_dir, compression_opt
 
 default_language = "English"
 
-SUPPORTED_OPTIMIZATIONS = ["INT4", "INT4-AWQ", "INT8", "FP16"]
+SUPPORTED_OPTIMIZATIONS = [ "INT8"]
 
 
 def get_llm_selection_widget(languages=list(SUPPORTED_LLM_MODELS), models=SUPPORTED_LLM_MODELS[default_language], show_preconverted_checkbox=True):
