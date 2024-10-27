@@ -149,7 +149,6 @@ def make_demo(
                         )
         
             with gr.Column(scale=4):
-                theme=gr.themes.Soft(),
                 chatbot = gr.Chatbot(
                     height=800,
                     label="Step 3: Input Query",
