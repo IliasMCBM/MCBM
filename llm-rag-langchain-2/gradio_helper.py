@@ -1,13 +1,13 @@
 from typing import Callable
 import gradio as gr
 from PIL import Image
-import pytesseract  # For OCR functionality
+import pytesseract  
 
 # Example messages for the QA chatbot
 english_examples = [
-    ["How can I make a healthier version of pizza?"],
+    ["Does this contain any preservatives?"],
     ["How can I make my salad high in protein without adding meat?"],
-    ["What’s a healthy substitute for butter when cooking?"],
+    ["Is this food item healthy?"],
     ["What are some gluten-free options for pasta?"],
     ["What can I eat with grilled chicken to make it a balanced dinner?"]
 ]
@@ -35,10 +35,10 @@ def make_demo(
     text_example_path = "text_example_en.pdf"
 
     with gr.Blocks(
-        theme=gr.themes.Soft(),
+        theme='freddyaboulton/dracula_revamped',
         css=".disclaimer {font-variant-caps: all-small-caps;}",
     ) as demo:
-        gr.Markdown("""<h1><center>QA over Document and Image</center></h1>""")
+        gr.Markdown("""<h1><center>Smarter Food Choices with RAG and OCR</center></h1>""")
         gr.Markdown(f"""<center>Powered by OpenVINO and {model_name} </center>""")
 
         with gr.Row():

@@ -104,7 +104,7 @@ def get_optimum_cli_command(model_id, weight_format, output_dir, compression_opt
 
 default_language = "English"
 
-SUPPORTED_OPTIMIZATIONS = [ "INT8", "FP16"]
+SUPPORTED_OPTIMIZATIONS = ["INT8"]
 
 
 def get_llm_selection_widget(languages=list(SUPPORTED_LLM_MODELS), models=SUPPORTED_LLM_MODELS[default_language], show_preconverted_checkbox=True):
@@ -112,14 +112,11 @@ def get_llm_selection_widget(languages=list(SUPPORTED_LLM_MODELS), models=SUPPOR
 
     lang_dropdown = widgets.Dropdown(options=languages or [])
 
-    # Define dependent drop down
-
     model_dropdown = widgets.Dropdown(options=models)
 
     def dropdown_handler(change):
         global default_language
         default_language = change.new
-        # If statement checking on dropdown value and changing options of the dependent dropdown accordingly
         model_dropdown.options = SUPPORTED_LLM_MODELS[change.new]
 
     lang_dropdown.observe(dropdown_handler, names="value")
@@ -167,7 +164,7 @@ def convert_tokenizer(model_id, remote_code, model_dir):
 def convert_and_compress_model(model_id, model_config, precision, use_preconverted=True):
     from pathlib import Path
     from IPython.display import Markdown, display
-    import subprocess  # nosec - disable B404:import-subprocess check
+    import subprocess  
     import platform
 
     pt_model_id = model_config["model_id"]
@@ -196,8 +193,6 @@ def convert_and_compress_model(model_id, model_config, precision, use_preconvert
             return model_dir
 
     model_compression_params = {}
-    if "INT4" in precision:
-        model_compression_params = compression_configs.get(model_id, compression_configs["default"])
     weight_format = precision.split("-")[0].lower()
     optimum_cli_command = get_optimum_cli_command(pt_model_id, weight_format, model_dir, model_compression_params, "AWQ" in precision, remote_code)
     print(f"⌛ {model_id} conversion to {precision} started. It may takes some time.")
