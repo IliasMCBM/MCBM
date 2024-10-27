@@ -149,9 +149,11 @@ def make_demo(
                         )
 
             with gr.Column(scale=4):
+                
                 chatbot = gr.Chatbot(
                     height=800,
                     label="Step 3: Input Query",
+                    theme=gr.themes.Soft(),
                 )
                 with gr.Row():
                     msg = gr.Textbox(
