@@ -35,7 +35,7 @@ def make_demo(
     text_example_path = "text_example_en.pdf"
 
     with gr.Blocks(
-        theme='freddyaboulton/dracula_revamped',
+        theme='Nymbo/Nymbo_Theme',
         css=".disclaimer {font-variant-caps: all-small-caps;}",
     ) as demo:
         gr.Markdown("""<h1><center>Smarter Food Choices with RAG and OCR</center></h1>""")
@@ -152,7 +152,6 @@ def make_demo(
                 chatbot = gr.Chatbot(
                     height=800,
                     label="Step 3: Input Query",
-                    theme=gr.themes.Soft(),
                 )
                 with gr.Row():
                     msg = gr.Textbox(
