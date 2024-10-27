@@ -79,7 +79,7 @@ execute the llm-rag-langchain.ipynb all the way until the last cell
 4. Receive detailed, contextualized responses
 
 ## Example
-![example]([http://url/to/img.png](https://miro.medium.com/v2/resize:fit:4800/format:webp/1*9iGM-lqDR8OkKP2J0wRo1A.png))
+![example](](https://miro.medium.com/v2/resize:fit:4800/format:webp/1*9iGM-lqDR8OkKP2J0wRo1A.png))
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
